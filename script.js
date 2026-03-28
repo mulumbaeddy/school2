@@ -1,6 +1,104 @@
 // ============================================
 // FIREBASE CONFIGURATION
 // ============================================
+// ============================================
+// OFFLINE DETECTION - ONLY ON INITIAL LOAD
+// Does NOT interrupt user while using the app
+// ============================================
+
+let offlineMessageShown = false;
+
+// Function to show offline message (only on initial load)
+function showInitialOfflineMessage() {
+    if (offlineMessageShown) return;
+    
+    const loginPage = document.getElementById('loginPage');
+    const mainApp = document.getElementById('mainApp');
+    const offlineMessage = document.getElementById('offlineMessage');
+    
+    if (offlineMessage) {
+        offlineMessage.style.display = 'flex';
+    } else {
+        // Create offline message
+        const div = document.createElement('div');
+        div.id = 'offlineMessage';
+        div.innerHTML = `
+            <div style="
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(135deg, #ff862d, #0a605a);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 99999;
+                font-family: 'Segoe UI', sans-serif;
+            ">
+                <div style="
+                    background: white;
+                    border-radius: 30px;
+                    padding: 40px;
+                    text-align: center;
+                    max-width: 400px;
+                    margin: 20px;
+                    box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+                ">
+                    <i class="bi bi-wifi-off" style="font-size: 80px; color: #ff862d; display: block; margin-bottom: 20px;"></i>
+                    <h2 style="color: #0a605a; margin-bottom: 15px;">No Internet Connection</h2>
+                    <p style="color: #666; margin-bottom: 25px;">Please check your internet connection and refresh the page.</p>
+                    <button onclick="location.reload()" style="
+                        background: linear-gradient(135deg, #ff862d, #0a605a);
+                        color: white;
+                        border: none;
+                        padding: 12px 30px;
+                        border-radius: 50px;
+                        font-size: 16px;
+                        font-weight: bold;
+                        cursor: pointer;
+                    ">Refresh</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(div);
+    }
+    
+    if (loginPage) loginPage.style.display = 'none';
+    if (mainApp) mainApp.style.display = 'none';
+    offlineMessageShown = true;
+}
+
+function hideOfflineMessage() {
+    const offlineMessage = document.getElementById('offlineMessage');
+    if (offlineMessage) {
+        offlineMessage.style.display = 'none';
+    }
+}
+
+// Check internet ONLY when page first loads
+function checkInternetOnStart() {
+    if (!navigator.onLine) {
+        showInitialOfflineMessage();
+        return false;
+    }
+    return true;
+}
+
+// Run on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Only check internet when page first loads
+    if (!checkInternetOnStart()) {
+        return; // Stop execution, show offline message
+    }
+    
+    // Continue with normal app initialization
+    console.log('✅ Internet connected - loading app');
+});
+
+// Do NOT show offline message while using the app
+// Remove the online/offline event listeners that would interrupt user
+// window.removeEventListener('online', ...) - we don't add them
 const firebaseConfig = {
     apiKey: "AIzaSyDGsVZcWkeDgSAnQmmoRtKg0VkhZCEA6w4",
     authDomain: "school-fcbbd.firebaseapp.com",
@@ -252,6 +350,34 @@ auth.onAuthStateChanged(async (user) => {
     } else {
         document.getElementById('loginPage').style.display = 'flex';
         document.getElementById('mainApp').style.display = 'none';
+    }
+
+    const loginPage = document.getElementById('loginPage');
+    const mainApp = document.getElementById('mainApp');
+    
+    // If offline message is already showing, don't proceed
+    if (document.getElementById('offlineMessage') && 
+        document.getElementById('offlineMessage').style.display === 'flex') {
+        return;
+    }
+    
+    if (user) {
+        if (loginPage) loginPage.style.display = 'none';
+        if (mainApp) mainApp.style.display = 'block';
+        
+        // Load data
+        try {
+            await loadAllData();
+        } catch (error) {
+            console.error('Data load error:', error);
+            // Show error but don't block app
+            if (typeof showError === 'function') {
+                showError('Failed to load some data. Please refresh.');
+            }
+        }
+    } else {
+        if (loginPage) loginPage.style.display = 'flex';
+        if (mainApp) mainApp.style.display = 'none';
     }
 });
 
