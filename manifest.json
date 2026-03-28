@@ -1,0 +1,16 @@
+{
+  "name": "EduManage Pro",
+  "short_name": "EduManage",
+  "description": "School Management System",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0a605a",
+  "theme_color": "#ff862d",
+  "icons": [
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
