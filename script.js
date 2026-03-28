@@ -2,103 +2,70 @@
 // FIREBASE CONFIGURATION
 // ============================================
 // ============================================
-// OFFLINE DETECTION - ONLY ON INITIAL LOAD
-// Does NOT interrupt user while using the app
+// OFFLINE DETECTION - WORKS AFTER REFRESH
 // ============================================
 
-let offlineMessageShown = false;
+const offlineBanner = document.getElementById('offlineBanner');
 
-// Function to show offline message (only on initial load)
-function showInitialOfflineMessage() {
-    if (offlineMessageShown) return;
-    
-    const loginPage = document.getElementById('loginPage');
-    const mainApp = document.getElementById('mainApp');
-    const offlineMessage = document.getElementById('offlineMessage');
-    
-    if (offlineMessage) {
-        offlineMessage.style.display = 'flex';
-    } else {
-        // Create offline message
-        const div = document.createElement('div');
-        div.id = 'offlineMessage';
-        div.innerHTML = `
-            <div style="
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: linear-gradient(135deg, #ff862d, #0a605a);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                z-index: 99999;
-                font-family: 'Segoe UI', sans-serif;
-            ">
-                <div style="
-                    background: white;
-                    border-radius: 30px;
-                    padding: 40px;
-                    text-align: center;
-                    max-width: 400px;
-                    margin: 20px;
-                    box-shadow: 0 20px 40px rgba(0,0,0,0.2);
-                ">
-                    <i class="bi bi-wifi-off" style="font-size: 80px; color: #ff862d; display: block; margin-bottom: 20px;"></i>
-                    <h2 style="color: #0a605a; margin-bottom: 15px;">No Internet Connection</h2>
-                    <p style="color: #666; margin-bottom: 25px;">Please check your internet connection and refresh the page.</p>
-                    <button onclick="location.reload()" style="
-                        background: linear-gradient(135deg, #ff862d, #0a605a);
-                        color: white;
-                        border: none;
-                        padding: 12px 30px;
-                        border-radius: 50px;
-                        font-size: 16px;
-                        font-weight: bold;
-                        cursor: pointer;
-                    ">Refresh</button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(div);
+// Function to show offline banner
+function showOffline() {
+    if (offlineBanner) {
+        offlineBanner.style.display = 'block';
     }
-    
-    if (loginPage) loginPage.style.display = 'none';
-    if (mainApp) mainApp.style.display = 'none';
-    offlineMessageShown = true;
+    // Optional: disable buttons or show message
+    console.log('🔴 OFFLINE - No internet connection');
 }
 
-function hideOfflineMessage() {
-    const offlineMessage = document.getElementById('offlineMessage');
-    if (offlineMessage) {
-        offlineMessage.style.display = 'none';
+// Function to hide offline banner
+function hideOffline() {
+    if (offlineBanner) {
+        offlineBanner.style.display = 'none';
     }
+    console.log('🟢 ONLINE - Connected to internet');
 }
 
-// Check internet ONLY when page first loads
-function checkInternetOnStart() {
+// Check internet status IMMEDIATELY (before anything loads)
+function checkInternetStatus() {
     if (!navigator.onLine) {
-        showInitialOfflineMessage();
+        showOffline();
         return false;
+    } else {
+        hideOffline();
+        return true;
     }
-    return true;
 }
 
-// Run on page load
+// Run check immediately (synchronous)
+checkInternetStatus();
+
+// Also check when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
-    // Only check internet when page first loads
-    if (!checkInternetOnStart()) {
-        return; // Stop execution, show offline message
-    }
-    
-    // Continue with normal app initialization
-    console.log('✅ Internet connected - loading app');
+    checkInternetStatus();
 });
 
-// Do NOT show offline message while using the app
-// Remove the online/offline event listeners that would interrupt user
-// window.removeEventListener('online', ...) - we don't add them
+// Listen for connection changes
+window.addEventListener('online', function() {
+    hideOffline();
+    // Optional: reload to refresh data
+    setTimeout(() => {
+        if (confirm('Internet connection restored! Reload to continue?')) {
+            window.location.reload();
+        }
+    }, 500);
+});
+
+window.addEventListener('offline', function() {
+    showOffline();
+});
+
+// Optional: Check every 5 seconds (for unstable connections)
+setInterval(function() {
+    if (!navigator.onLine) {
+        showOffline();
+    } else {
+        hideOffline();
+    }
+}, 5000);
 const firebaseConfig = {
     apiKey: "AIzaSyDGsVZcWkeDgSAnQmmoRtKg0VkhZCEA6w4",
     authDomain: "school-fcbbd.firebaseapp.com",
