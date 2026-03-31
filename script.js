@@ -7462,10 +7462,15 @@ function generateProfessionalClearanceCard(student, balance, school, currentTerm
 // ============================================
 // SHOW CLEARANCE MANAGER
 // ============================================
+// ============================================
+// CLEARANCE CARD MANAGER WITH FILTERS INSIDE MODAL
+// ============================================
+
 window.showClearanceManager = function() {
-    const fullyPaidStudents = getFullyPaidStudentsForClearance();
+    // Get all fully paid students first
+    let allFullyPaidStudents = getFullyPaidStudentsForClearance();
     
-    if (fullyPaidStudents.length === 0) {
+    if (allFullyPaidStudents.length === 0) {
         Swal.fire({
             icon: 'info',
             title: 'No Fully Paid Students',
@@ -7479,13 +7484,59 @@ window.showClearanceManager = function() {
     const currentTerm = getCurrentTerm();
     const currentYear = new Date().getFullYear().toString();
     
-    let studentsTable = '';
+    // Store current filtered list
+    let currentFilteredStudents = [...allFullyPaidStudents];
+    let activeFilters = { class: 'all', stream: 'all', year: 'all' };
     
-    fullyPaidStudents.forEach(student => {
-        const balance = calculateStudentBalance(student.id, currentTerm, currentYear);
+    // Function to apply filters and refresh table
+    function applyFiltersAndRefresh() {
+        const classFilter = document.getElementById('clearanceFilterClass')?.value || 'all';
+        const streamFilter = document.getElementById('clearanceFilterStream')?.value || 'all';
+        const yearFilter = document.getElementById('clearanceFilterYear')?.value || 'all';
         
-        studentsTable += `
-            <tr>
+        activeFilters = { class: classFilter, stream: streamFilter, year: yearFilter };
+        
+        // Apply filters
+        currentFilteredStudents = [...allFullyPaidStudents];
+        
+        if (classFilter !== 'all') {
+            currentFilteredStudents = currentFilteredStudents.filter(s => s.class === classFilter);
+        }
+        
+        if (streamFilter !== 'all') {
+            currentFilteredStudents = currentFilteredStudents.filter(s => s.stream === streamFilter);
+        }
+        
+        if (yearFilter !== 'all') {
+            currentFilteredStudents = currentFilteredStudents.filter(s => {
+                return s.promotionYear === yearFilter || 
+                       s.enrollmentYear === yearFilter ||
+                       !s.promotionYear;
+            });
+        }
+        
+        // Update the table body
+        updateTableBody();
+        updateFilterBadge();
+    }
+    
+    // Function to update the table body
+    function updateTableBody() {
+        const tbody = document.getElementById('clearanceTableBody');
+        if (!tbody) return;
+        
+        if (currentFilteredStudents.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">
+                <i class="bi bi-search me-2"></i>No students match the selected filters
+            </td></tr>`;
+            return;
+        }
+        
+        let html = '';
+        currentFilteredStudents.forEach(student => {
+            const balance = calculateStudentBalance(student.id, currentTerm, currentYear);
+            
+            html += `<tr>
                 <td style="padding: 10px;"><strong>${student.admissionNo || 'N/A'}</strong></td>
                 <td style="padding: 10px;">${escapeHtml(student.name)}</td>
                 <td style="padding: 10px;">${student.class} ${student.stream || ''}</td>
@@ -7493,14 +7544,48 @@ window.showClearanceManager = function() {
                 <td style="padding: 10px; text-align: right;">UGX ${(balance.expected || 0).toLocaleString()}</td>
                 <td style="padding: 10px; text-align: center;"><span class="badge bg-success">FULLY PAID</span></td>
                 <td style="padding: 10px; text-align: center;">
-                    <button class="btn btn-sm btn-success" onclick="generateClearanceCard('${student.id}')">
-                        <i class="bi bi-card-checklist"></i> Card
+                    <button class="btn btn-sm btn-success" onclick="generateClearanceCard('${student.id}'); Swal.close();">
+                        <i class="bi bi-card-checklist"></i> Generate Card
                     </button>
                 </td>
-            </tr>
-        `;
-    });
+            </tr>`;
+        });
+        
+        tbody.innerHTML = html;
+    }
     
+    // Function to update filter badge
+    function updateFilterBadge() {
+        const badge = document.getElementById('filterResultCount');
+        if (badge) {
+            badge.textContent = currentFilteredStudents.length;
+        }
+    }
+    
+    // Function to reset filters
+    function resetFilters() {
+        const classSelect = document.getElementById('clearanceFilterClass');
+        const streamSelect = document.getElementById('clearanceFilterStream');
+        const yearSelect = document.getElementById('clearanceFilterYear');
+        
+        if (classSelect) classSelect.value = 'all';
+        if (streamSelect) streamSelect.value = 'all';
+        if (yearSelect) yearSelect.value = 'all';
+        
+        applyFiltersAndRefresh();
+        showSuccess('Filters reset');
+    }
+    
+    // Build the filter display text
+    function getFilterDisplayText() {
+        const parts = [];
+        if (activeFilters.class !== 'all') parts.push(`Class: ${activeFilters.class}`);
+        if (activeFilters.stream !== 'all') parts.push(`Stream: ${activeFilters.stream}`);
+        if (activeFilters.year !== 'all') parts.push(`Year: ${activeFilters.year}`);
+        return parts.length > 0 ? parts.join(' | ') : 'No filters applied';
+    }
+    
+    // Create the modal HTML with filters INSIDE
     Swal.fire({
         title: '<i class="bi bi-card-checklist me-2 text-success"></i> Clearance Card Manager',
         html: `
@@ -7513,13 +7598,73 @@ window.showClearanceManager = function() {
                     <small>${school.address}</small>
                 </div>
                 
+                <!-- FILTERS SECTION INSIDE MODAL -->
+                <div class="card mb-3" style="background: #f8f9fa;">
+                    <div class="card-body">
+                        <h6 class="mb-3"><i class="bi bi-funnel-fill me-2 text-primary"></i>Filter Students</h6>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small">Class</label>
+                                <select class="form-select form-select-sm" id="clearanceFilterClass" onchange="window.applyClearanceFilters()">
+                                    <option value="all">All Classes</option>
+                                    <option value="S.1">S.1</option>
+                                    <option value="S.2">S.2</option>
+                                    <option value="S.3">S.3</option>
+                                    <option value="S.4">S.4</option>
+                                    <option value="S.5">S.5</option>
+                                    <option value="S.6">S.6</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small">Stream</label>
+                                <select class="form-select form-select-sm" id="clearanceFilterStream" onchange="window.applyClearanceFilters()">
+                                    <option value="all">All Streams</option>
+                                    <option value="A">A</option>
+                                    <option value="B">B</option>
+                                    <option value="C">C</option>
+                                    <option value="D">D</option>
+                                    <option value="Arts">Arts</option>
+                                    <option value="Sciences">Sciences</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small">Year</label>
+                                <select class="form-select form-select-sm" id="clearanceFilterYear" onchange="window.applyClearanceFilters()">
+                                    <option value="all">All Years</option>
+                                    <option value="2023">2023</option>
+                                    <option value="2024">2024</option>
+                                    <option value="2025">2025</option>
+                                    <option value="2026">2026</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="row mt-3">
+                            <div class="col-12 d-flex justify-content-between align-items-center">
+                                <div class="small text-muted">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Showing: <strong id="filterResultCount">${allFullyPaidStudents.length}</strong> of ${allFullyPaidStudents.length} students
+                                    <span id="filterActiveBadge" class="badge bg-secondary ms-2">${getFilterDisplayText()}</span>
+                                </div>
+                                <div>
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="window.resetClearanceFilters()">
+                                        <i class="bi bi-arrow-repeat me-1"></i>Reset
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- Action Buttons -->
                 <div class="d-flex gap-2 mb-3 justify-content-end">
-                    <button class="btn btn-primary" onclick="generateAllClearanceCards()">
-                        <i class="bi bi-files"></i> Generate All (${fullyPaidStudents.length})
+                    <button class="btn btn-primary btn-sm" id="generateFilteredBtn" onclick="window.generateFilteredClearanceCardsFromModal()">
+                        <i class="bi bi-files me-2"></i>Generate All (${allFullyPaidStudents.length})
                     </button>
-                    <button class="btn btn-info" onclick="exportClearanceList()">
-                        <i class="bi bi-file-excel"></i> Export List
+                    <button class="btn btn-info btn-sm" id="exportFilteredBtn" onclick="window.exportFilteredClearanceListFromModal()">
+                        <i class="bi bi-file-excel me-2"></i>Export List
                     </button>
                 </div>
                 
@@ -7527,7 +7672,7 @@ window.showClearanceManager = function() {
                 <h6 class="mb-2">Fully Paid Students:</h6>
                 <div style="max-height: 400px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 8px;">
                     <table class="table table-sm table-bordered mb-0">
-                        <thead class="table-success">
+                        <thead class="table-success" style="position: sticky; top: 0; z-index: 1;">
                             <tr>
                                 <th>Adm No</th>
                                 <th>Name</th>
@@ -7538,11 +7683,10 @@ window.showClearanceManager = function() {
                                 <th>Action</th>
                             </tr>
                         </thead>
-                        <tbody>${studentsTable}</tbody>
+                        <tbody id="clearanceTableBody">
+                            <tr><td colspan="7" class="text-center py-4">Loading...</td></tr>
+                        </tbody>
                     </table>
-                </div>
-                <div class="mt-2 text-muted small">
-                    <i class="bi bi-info-circle"></i> Click "Card" to generate individual clearance certificate
                 </div>
             </div>
         `,
@@ -7550,10 +7694,129 @@ window.showClearanceManager = function() {
         showConfirmButton: false,
         showCancelButton: true,
         cancelButtonText: '<i class="bi bi-x-circle me-2"></i>Close',
-        cancelButtonColor: '#6c757d'
+        cancelButtonColor: '#6c757d',
+        didOpen: () => {
+            // Initialize the table with all students
+            updateTableBody();
+            updateFilterBadge();
+            
+            // Store functions on window for access from inside modal
+            window.applyClearanceFilters = applyFiltersAndRefresh;
+            window.resetClearanceFilters = resetFilters;
+            window.generateFilteredClearanceCardsFromModal = function() {
+                if (currentFilteredStudents.length === 0) {
+                    Swal.fire('Info', 'No students to generate cards for', 'info');
+                    return;
+                }
+                generateBulkClearanceCards(currentFilteredStudents);
+            };
+            window.exportFilteredClearanceListFromModal = function() {
+                if (currentFilteredStudents.length === 0) {
+                    Swal.fire('Info', 'No students to export', 'info');
+                    return;
+                }
+                exportClearanceListToCSV(currentFilteredStudents);
+            };
+        },
+        willClose: () => {
+            // Clean up
+            delete window.applyClearanceFilters;
+            delete window.resetClearanceFilters;
+            delete window.generateFilteredClearanceCardsFromModal;
+            delete window.exportFilteredClearanceListFromModal;
+        }
     });
 };
 
+// Helper function to generate bulk clearance cards
+function generateBulkClearanceCards(studentsList) {
+    if (!studentsList || studentsList.length === 0) return;
+    
+    const school = getClearanceSchoolInfo();
+    const currentTerm = getCurrentTerm();
+    const currentYear = new Date().getFullYear().toString();
+    
+    let allCards = '';
+    
+    studentsList.forEach((student, index) => {
+        const balance = calculateStudentBalance(student.id, currentTerm, currentYear);
+        const cardHtml = generateProfessionalClearanceCard(student, balance, school, currentTerm, currentYear);
+        
+        allCards += `
+            <div class="clearance-card-container" style="page-break-after: always; margin-bottom: 30px;">
+                ${cardHtml}
+                ${index < studentsList.length - 1 ? '<div style="page-break-after: always;"></div>' : ''}
+            </div>
+        `;
+    });
+    
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Bulk Clearance Cards (${studentsList.length} Cards)</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+            <style>
+                body { padding: 20px; background: #f0f2f5; }
+                @media print { body { padding: 0; background: white; } }
+                .clearance-card-container { margin-bottom: 30px; }
+                @media print { .clearance-card-container { page-break-after: always; } }
+                .no-print { display: block; }
+                @media print { .no-print { display: none; } }
+            </style>
+        </head>
+        <body>
+            <div class="print-header no-print" style="text-align:center; margin-bottom:20px; padding:15px; background: linear-gradient(135deg, #28a745, #20c997); color:white; border-radius:10px;">
+                <h2><i class="bi bi-card-checklist me-2"></i>Bulk Clearance Certificates</h2>
+                <p>Total: ${studentsList.length} certificates | Generated: ${new Date().toLocaleString()}</p>
+                <div class="mt-3">
+                    <button class="btn btn-light btn-lg mx-2" onclick="window.print()">🖨️ Print All</button>
+                    <button class="btn btn-outline-light btn-lg mx-2" onclick="window.close()">❌ Close</button>
+                </div>
+            </div>
+            ${allCards}
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+    
+    Swal.fire('Success', `${studentsList.length} clearance cards generated`, 'success');
+}
+
+// Helper function to export clearance list to CSV
+function exportClearanceListToCSV(studentsList) {
+    if (!studentsList || studentsList.length === 0) return;
+    
+    const currentTerm = getCurrentTerm();
+    const currentYear = new Date().getFullYear().toString();
+    
+    let csv = 'Admission No,Name,Class,Stream,Parent Name,Parent Phone,Total Paid (UGX),Expected Fees (UGX),Balance (UGX),Status,Date Generated\n';
+    
+    studentsList.forEach(student => {
+        const balance = calculateStudentBalance(student.id, currentTerm, currentYear);
+        csv += `"${student.admissionNo || ''}",`;
+        csv += `"${student.name}",`;
+        csv += `"${student.class}",`;
+        csv += `"${student.stream || ''}",`;
+        csv += `"${student.parentName || ''}",`;
+        csv += `"${student.parentPhone || ''}",`;
+        csv += `${balance.totalPaid || 0},`;
+        csv += `${balance.expected || 0},`;
+        csv += `${balance.balance},`;
+        csv += `"FULLY PAID",`;
+        csv += `"${new Date().toLocaleDateString()}"\n`;
+    });
+    
+    const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `clearance_list_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    
+    Swal.fire('Success', `Exported ${studentsList.length} students to CSV`, 'success');
+}
 // ============================================
 // GENERATE SINGLE CLEARANCE CARD
 // ============================================
@@ -7747,6 +8010,7 @@ window.generateAllClearanceCards = function() {
         }
     });
 };
+
 
 // ============================================
 // EXPORT CLEARANCE LIST
@@ -8015,33 +8279,13 @@ function generateReportHTML(student, marks, payments, term, year, promotionStatu
         <div style="max-width: 1100px; margin: 0 auto; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1); position: relative;">
             
             <!-- WATERMARK - Background Pattern -->
-            <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 0; overflow: hidden;">
-                <div style="position: absolute; top: 20%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); 
-                            font-size: 80px; font-weight: bold; color: rgba(0,0,0,0.03); white-space: nowrap;
-                            font-family: Arial, sans-serif;">
-                    ${year}
-                </div>
-                <div style="position: absolute; top: 40%; left: 10%; transform: rotate(-25deg); 
-                            font-size: 60px; font-weight: bold; color: rgba(0,0,0,0.02);">
-                    ${year}
-                </div>
-                <div style="position: absolute; bottom: 20%; right: 5%; transform: rotate(20deg); 
-                            font-size: 70px; font-weight: bold; color: rgba(0,0,0,0.02);">
-                    ${year}
-                </div>
-                <div style="position: absolute; top: 60%; left: 70%; transform: rotate(15deg); 
-                            font-size: 55px; font-weight: bold; color: rgba(0,0,0,0.02);">
-                    ${year}
-                </div>
-                <div style="position: absolute; bottom: 40%; left: 20%; transform: rotate(-10deg); 
-                            font-size: 65px; font-weight: bold; color: rgba(0,0,0,0.02);">
-                    ${year}
-                </div>
-                <div style="position: absolute; top: 80%; left: 40%; transform: rotate(5deg); 
-                            font-size: 50px; font-weight: bold; color: rgba(0,0,0,0.02);">
-                    ${school.name}
-                </div>
-            </div>
+<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-10deg); 
+            pointer-events: none; z-index: 0; opacity: 0.18;">
+    ${school.logo ? 
+        `<img src="${school.logo}" style="width: 750px; height: 750px; max-width: 75vw; max-height: 75vh; object-fit: contain;">` : 
+        `<div style="font-size: 180px; font-weight: bold; color: rgba(0,0,0,0.18);">${school.name.charAt(0)}</div>`
+    }
+</div>
             
             <!-- MAIN CONTENT -->
             <div style="position: relative; z-index: 1;">
@@ -16353,28 +16597,7 @@ window.previewEmailLogo = function(input) {
     }
 };
 
-// ============================================
-// TEST EMAIL CONNECTION
-// ============================================
-window.testEmailConnection = async function() {
-    const testEmail = document.getElementById('testEmail')?.value;
-    if (!testEmail) {
-        showError('Please enter a test email address');
-        return;
-    }
-    
-    showLoading('Sending test email...');
-    
-    try {
-        // Simulate email test - in production, this would call a cloud function
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        showSuccess(`✅ Test email sent to ${testEmail}`);
-    } catch (error) {
-        showError('❌ Failed to send test email: ' + error.message);
-    } finally {
-        hideLoading();
-    }
-};
+
 
 // ============================================
 // UTILITY FUNCTIONS
@@ -16524,6 +16747,11 @@ window.previewEmailLogo = previewEmailLogo;
 window.testEmailConnection = testEmailConnection;
 
 console.log('✅ Settings Management - All 10 Parts Fully Loaded');
+
+
+
+
+
 
 
 
@@ -17331,6 +17559,9 @@ document.querySelector('[data-section="dashboard"]').addEventListener('click', f
                 console.log('💡 Install button will appear when browser is ready (usually 5-15 seconds)');
             }
         }, 3000);
+
+
+        
 
 
 // ============================================
